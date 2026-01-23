@@ -6,8 +6,10 @@ from flask import Flask, request, jsonify, render_template, session
 from config import Config
 from utils.jiandaoyun_api import JiandaoyunAPI
 from utils.wechat_api import WeChatAPI
+from scheduler import DailyReportScheduler
 import hashlib
 import xml.etree.ElementTree as ET
+import time
 
 mytoken = "MyWeChat2026htjiac"
 
@@ -17,6 +19,9 @@ app.config.from_object(Config)
 # 初始化API客户端
 jdy_api = JiandaoyunAPI()
 wechat_api = WeChatAPI()
+
+# 初始化定时任务
+scheduler = DailyReportScheduler()
 
 #test
 
@@ -128,6 +133,92 @@ def bind_page():
     return render_template('bind.html', openid=openid)
 
 
+@app.route('/get_openid', methods=['GET'])
+def get_openid():
+    """
+    获取OpenID测试页面
+    用于微信网页授权获取用户OpenID
+    """
+    code = request.args.get('code', '')
+    
+    # 如果没有code，重定向到微信授权页面
+    if not code:
+        redirect_uri = request.url_root + 'get_openid'
+        auth_url = f'https://open.weixin.qq.com/connect/oauth2/authorize?appid={Config.WECHAT_APPID}&redirect_uri={redirect_uri}&response_type=code&scope=snsapi_base&state=STATE#wechat_redirect'
+        return f'<script>window.location.href="{auth_url}"</script>'
+    
+    # 使用code换取openid
+    try:
+        import requests
+        import urllib3
+        urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+        
+        url = 'https://api.weixin.qq.com/sns/oauth2/access_token'
+        params = {
+            'appid': Config.WECHAT_APPID,
+            'secret': Config.WECHAT_APPSECRET,
+            'code': code,
+            'grant_type': 'authorization_code'
+        }
+        
+        response = requests.get(url, params=params, timeout=10, verify=False)
+        data = response.json()
+        
+        if 'openid' in data:
+            openid = data['openid']
+            return f'''
+            <html>
+            <head>
+                <meta charset="utf-8">
+                <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                <title>获取OpenID</title>
+                <style>
+                    body {{ font-family: Arial, sans-serif; padding: 20px; }}
+                    .container {{ max-width: 600px; margin: 0 auto; }}
+                    .openid {{ 
+                        background: #f0f0f0; 
+                        padding: 15px; 
+                        border-radius: 5px; 
+                        word-break: break-all;
+                        margin: 20px 0;
+                    }}
+                    .btn {{ 
+                        background: #07c160; 
+                        color: white; 
+                        padding: 10px 20px; 
+                        border: none; 
+                        border-radius: 5px; 
+                        cursor: pointer;
+                    }}
+                </style>
+            </head>
+            <body>
+                <div class="container">
+                    <h2>您的OpenID</h2>
+                    <div class="openid">{openid}</div>
+                    <button class="btn" onclick="copyOpenID()">复制OpenID</button>
+                    <p style="color: #666; margin-top: 20px;">
+                        提示：您可以使用这个OpenID进行测试
+                    </p>
+                </div>
+                <script>
+                    function copyOpenID() {{
+                        const openid = '{openid}';
+                        navigator.clipboard.writeText(openid).then(() => {{
+                            alert('OpenID已复制到剪贴板');
+                        }});
+                    }}
+                </script>
+            </body>
+            </html>
+            '''
+        else:
+            return f'<h3>获取OpenID失败</h3><pre>{data}</pre>'
+            
+    except Exception as e:
+        return f'<h3>错误</h3><p>{str(e)}</p>'
+
+
 @app.route('/api/bind', methods=['POST'])
 def bind_phone():
     """
@@ -217,6 +308,31 @@ def check_bind():
     })
 
 
+@app.route('/api/test_reminder', methods=['POST'])
+def test_reminder():
+    """
+    测试接口：立即执行一次日报检查
+    仅用于开发测试
+    """
+    try:
+        scheduler.run_now()
+        return jsonify({
+            'success': True,
+            'message': '日报检查任务已执行，请查看控制台日志'
+        })
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'message': f'执行失败: {str(e)}'
+        }), 500
+
+
 if __name__ == '__main__':
-    import time
-    app.run(host='0.0.0.0', port=5000, debug=True)
+    # 启动定时任务
+    scheduler.start()
+    
+    try:
+        app.run(host='0.0.0.0', port=5000, debug=True)
+    except (KeyboardInterrupt, SystemExit):
+        # 停止定时任务
+        scheduler.stop()

@@ -5,6 +5,10 @@
 import requests
 from typing import Dict, List, Optional
 from config import Config
+import urllib3
+
+# 禁用SSL警告
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 
 class JiandaoyunAPI:
@@ -46,7 +50,7 @@ class JiandaoyunAPI:
         }
         
         try:
-            response = requests.post(url, json=payload, headers=self.headers, timeout=10)
+            response = requests.post(url, json=payload, headers=self.headers, timeout=10, verify=False)
             response.raise_for_status()
             data = response.json()
             
@@ -82,7 +86,7 @@ class JiandaoyunAPI:
         }
         
         try:
-            response = requests.post(url, json=payload, headers=self.headers, timeout=10)
+            response = requests.post(url, json=payload, headers=self.headers, timeout=10, verify=False)
             response.raise_for_status()
             data = response.json()
             
@@ -110,7 +114,7 @@ class JiandaoyunAPI:
         }
         
         try:
-            response = requests.post(url, json=payload, headers=self.headers, timeout=10)
+            response = requests.post(url, json=payload, headers=self.headers, timeout=10, verify=False)
             response.raise_for_status()
             data = response.json()
             
@@ -121,3 +125,51 @@ class JiandaoyunAPI:
         except requests.exceptions.RequestException as e:
             print(f'获取员工列表失败: {e}')
             return []
+    
+    def get_daily_report(self, phone: str, date: str) -> Optional[Dict]:
+        """
+        查询指定员工指定日期的日报
+        
+        Args:
+            phone: 员工手机号
+            date: 日期，格式：YYYY-MM-DD
+            
+        Returns:
+            日报信息字典，未找到返回None
+        """
+        url = f'{self.base_url}/app/entry/data/list'
+        payload = {
+            'app_id': self.app_id,
+            'entry_id': Config.JIANDAOYUN_DAILY_REPORT_ENTRY_ID,
+            'fields': ['phonenumber', 'rbdate', 'ygxm', 'szbm', 'gznr', 'gzjd', 'mrgzhb'],
+            'filter': {
+                'rel': 'and',
+                'cond': [
+                    {
+                        'field': 'phonenumber',
+                        'type': 'text',
+                        'method': 'eq',
+                        'value': [phone]
+                    },
+                    {
+                        'field': 'rbdate',
+                        'type': 'datetime',
+                        'method': 'eq',
+                        'value': [date]
+                    }
+                ]
+            }
+        }
+        
+        try:
+            response = requests.post(url, json=payload, headers=self.headers, timeout=10, verify=False)
+            response.raise_for_status()
+            data = response.json()
+            
+            if data.get('data') and len(data['data']) > 0:
+                return data['data'][0]
+            return None
+            
+        except requests.exceptions.RequestException as e:
+            print(f'查询日报失败: {e}')
+            return None

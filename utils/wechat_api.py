@@ -6,6 +6,10 @@ import requests
 import time
 from typing import Optional, Dict
 from config import Config
+import urllib3
+
+# 禁用SSL警告
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 
 class WeChatAPI:
@@ -37,7 +41,7 @@ class WeChatAPI:
         }
         
         try:
-            response = requests.get(url, params=params, timeout=10)
+            response = requests.get(url, params=params, timeout=10, verify=False)
             response.raise_for_status()
             data = response.json()
             
@@ -76,7 +80,7 @@ class WeChatAPI:
         }
         
         try:
-            response = requests.get(url, params=params, timeout=10)
+            response = requests.get(url, params=params, timeout=10, verify=False)
             response.raise_for_status()
             data = response.json()
             
@@ -117,7 +121,7 @@ class WeChatAPI:
         }
         
         try:
-            response = requests.post(api_url, json=payload, timeout=10)
+            response = requests.post(api_url, json=payload, timeout=10, verify=False)
             response.raise_for_status()
             result = response.json()
             
@@ -130,3 +134,47 @@ class WeChatAPI:
         except requests.exceptions.RequestException as e:
             print(f'发送模板消息请求失败: {e}')
             return False
+    
+    def send_daily_report_reminder(self, openid: str, employee_name: str, 
+                                   report_status: str, report_url: str = '') -> bool:
+        """
+        发送日报提醒消息
+        
+        Args:
+            openid: 接收者OpenID
+            employee_name: 员工姓名
+            report_status: 日报状态（submitted/pending/admin_notify）
+            report_url: 日报链接
+            
+        Returns:
+            发送成功返回True，失败返回False
+        """
+        template_id = Config.WECHAT_TEMPLATE_ID
+        
+        # 根据不同状态构造消息内容
+        if report_status == 'submitted':
+            # 员工本人 - 已提交
+            message_data = {
+                'first': {'value': '您今日的工作日报已提交成功', 'color': '#173177'},
+                'keyword1': {'value': employee_name, 'color': '#173177'},
+                'keyword2': {'value': time.strftime('%Y-%m-%d %H:%M:%S'), 'color': '#173177'},
+                'remark': {'value': '点击查看日报详情', 'color': '#173177'}
+            }
+        elif report_status == 'admin_notify':
+            # 管理员 - 员工已提交通知
+            message_data = {
+                'first': {'value': f'员工【{employee_name}】已提交今日工作日报', 'color': '#173177'},
+                'keyword1': {'value': employee_name, 'color': '#173177'},
+                'keyword2': {'value': time.strftime('%Y-%m-%d %H:%M:%S'), 'color': '#173177'},
+                'remark': {'value': '点击查看该员工日报详情', 'color': '#173177'}
+            }
+        else:  # pending
+            # 员工本人 - 未提交提醒
+            message_data = {
+                'first': {'value': '提醒您填写今日工作日报', 'color': '#173177'},
+                'keyword1': {'value': employee_name, 'color': '#173177'},
+                'keyword2': {'value': time.strftime('%Y-%m-%d %H:%M:%S'), 'color': '#173177'},
+                'remark': {'value': '请及时填写日报，点击进入填写页面', 'color': '#173177'}
+            }
+        
+        return self.send_template_message(openid, template_id, message_data, report_url)

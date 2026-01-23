@@ -13,8 +13,8 @@ class Config:
     # 简道云配置
     JIANDAOYUN_APP_ID = '696f27462cf9e340d630dde9'
     JIANDAOYUN_API_KEY = 'EFVTRmkmb44rwFjuUyg1PXFPCWlJjd70'
-    JIANDAOYUN_EMPLOYEE_ENTRY_ID = '6655515cbf78649a2284b627'  # 员工档案表
-    JIANDAOYUN_DAILY_REPORT_ENTRY_ID = '66554fa622ee7dd0c7bb5492'  # 日报数据表
+    JIANDAOYUN_EMPLOYEE_ENTRY_ID = '66554fa622ee7dd0c7bb5492'  # 员工档案表
+    JIANDAOYUN_DAILY_REPORT_ENTRY_ID = '6655515cbf78649a2284b627'  # 日报数据表
     JIANDAOYUN_API_BASE_URL = 'https://api.jiandaoyun.com/api/v5'
     
     # 微信服务号配置
@@ -24,3 +24,5 @@ class Config:
     
     # 服务器配置
     SERVER_IP = '8.137.123.138'
+    #域名
+    YUMING_HTJC = 'htjc.shop'
