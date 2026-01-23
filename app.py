@@ -18,6 +18,7 @@ app.config.from_object(Config)
 jdy_api = JiandaoyunAPI()
 wechat_api = WeChatAPI()
 
+#test
 
 @app.route('/')
 def index():
