@@ -79,24 +79,36 @@ class JiandaoyunAPI:
             'entry_id': Config.JIANDAOYUN_EMPLOYEE_ENTRY_ID,
             'data_id': data_id,
             'data': {
-                'wxopenid': {
-                    'value': openid
-                }
+                'wxopenid': openid
             }
         }
         
+        print(f'[DEBUG] 更新 OpenID 请求:')
+        print(f'  URL: {url}')
+        print(f'  data_id: {data_id}')
+        print(f'  openid: {openid}')
+        print(f'  payload: {payload}')
+        
         try:
             response = requests.post(url, json=payload, headers=self.headers, timeout=10, verify=False)
+            print(f'[DEBUG] 响应状态码: {response.status_code}')
+            print(f'[DEBUG] 响应内容: {response.text}')
+            
             response.raise_for_status()
             data = response.json()
             
-            # 检查返回数据中是否包含更新后的wxopenid
-            if data.get('data') and data['data'].get('wxopenid') == openid:
+            # 简道云更新成功通常返回 code: 0
+            if data.get('code') == 0:
+                print(f'[DEBUG] OpenID 更新成功')
                 return True
-            return False
+            else:
+                print(f'[DEBUG] OpenID 更新失败: {data}')
+                return False
             
         except requests.exceptions.RequestException as e:
             print(f'更新员工OpenID失败: {e}')
+            if hasattr(e, 'response') and e.response is not None:
+                print(f'[DEBUG] 错误响应: {e.response.text}')
             return False
     
     def get_all_employees_with_openid(self) -> List[Dict]:

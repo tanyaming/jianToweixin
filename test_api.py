@@ -76,10 +76,37 @@ def test_wechat():
     test_send = input('是否测试发送消息？(y/n): ').strip().lower()
     
     if test_send == 'y':
-        openid = input('请输入测试OpenID: ').strip()
+        # 先从简道云获取已绑定的 OpenID
+        print('\n提示：从简道云获取已绑定的 OpenID...')
+        jdy = JiandaoyunAPI()
+        employees = jdy.get_all_employees_with_openid()
+        
+        if employees:
+            print(f'\n找到 {len(employees)} 个已绑定员工:')
+            for i, emp in enumerate(employees[:10], 1):
+                name = emp.get('name', {}).get('name', '未知')
+                openid = emp.get('openid', '')
+                phone = emp.get('phonenumber', '')
+                print(f'{i}. {name} - {phone} - OpenID: {openid[:10]}...')
+            
+            choice = input('\n请选择员工编号（或直接输入 OpenID）: ').strip()
+            
+            if choice.isdigit() and 1 <= int(choice) <= len(employees):
+                selected_emp = employees[int(choice) - 1]
+                openid = selected_emp.get('openid', '')
+                name = selected_emp.get('name', {}).get('name', '测试员工')
+            else:
+                openid = choice
+                name = '测试员工'
+        else:
+            print('未找到已绑定的员工，请手动输入 OpenID')
+            openid = input('请输入测试OpenID: ').strip()
+            name = '测试员工'
+        
         if openid:
+            print(f'\n发送测试消息到: {name} ({openid[:10]}...)')
             success = wechat.send_daily_report_reminder(
-                openid, '测试员工', 'pending', 'https://www.jiandaoyun.com'
+                openid, name, 'pending', 'https://www.jiandaoyun.com'
             )
             if success:
                 print('✓ 消息发送成功')
