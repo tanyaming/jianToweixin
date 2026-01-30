@@ -79,7 +79,10 @@ class JiandaoyunAPI:
             'entry_id': Config.JIANDAOYUN_EMPLOYEE_ENTRY_ID,
             'data_id': data_id,
             'data': {
-                'wxopenid': openid
+                'wxopenid': 
+                {
+                    "value": openid
+                }
             }
         }
         

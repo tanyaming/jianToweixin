@@ -1,12 +1,17 @@
 # -*- coding: utf-8 -*-
 """
 微信API封装
+包含：
+1. 网页授权获取OpenID
+2. 模板消息发送
+3. 用户信息获取
 """
 import requests
 import time
-from typing import Optional, Dict
+from typing import Optional, Dict, Tuple
 from config import Config
 import urllib3
+import urllib.parse
 
 # 禁用SSL警告
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
@@ -21,9 +26,153 @@ class WeChatAPI:
         self.access_token = None
         self.token_expires_at = 0
     
+    def get_oauth_authorize_url(self, redirect_uri: str, scope: str = 'snsapi_base', 
+                               state: str = 'STATE') -> str:
+        """
+        生成微信网页授权URL
+        
+        Args:
+            redirect_uri: 授权后重定向的回调链接地址
+            scope: 应用授权作用域
+                   - snsapi_base: 静默授权，只能获取openid
+                   - snsapi_userinfo: 需要用户手动同意，可获取用户基本信息
+            state: 重定向后会带上state参数，可用于防止csrf攻击
+            
+        Returns:
+            微信授权URL
+        """
+        # URL编码回调地址
+        encoded_redirect_uri = urllib.parse.quote(redirect_uri, safe='')
+        
+        auth_url = (
+            f"https://open.weixin.qq.com/connect/oauth2/authorize?"
+            f"appid={self.appid}"
+            f"&redirect_uri={encoded_redirect_uri}"
+            f"&response_type=code"
+            f"&scope={scope}"
+            f"&state={state}"
+            f"#wechat_redirect"
+        )
+        
+        return auth_url
+    
+    def get_oauth_access_token(self, code: str) -> Optional[Dict]:
+        """
+        通过code换取网页授权access_token和openid
+        
+        注意：此access_token与基础支持的access_token不同
+        
+        Args:
+            code: 微信授权回调返回的code参数
+            
+        Returns:
+            包含access_token、openid等信息的字典，失败返回None
+            返回示例：
+            {
+                'access_token': 'ACCESS_TOKEN',
+                'expires_in': 7200,
+                'refresh_token': 'REFRESH_TOKEN',
+                'openid': 'OPENID',
+                'scope': 'snsapi_base'
+            }
+        """
+        url = 'https://api.weixin.qq.com/sns/oauth2/access_token'
+        params = {
+            'appid': self.appid,
+            'secret': self.appsecret,
+            'code': code,
+            'grant_type': 'authorization_code'
+        }
+        
+        try:
+            response = requests.get(url, params=params, timeout=10, verify=False)
+            response.raise_for_status()
+            data = response.json()
+            
+            if 'openid' in data:
+                return data
+            else:
+                print(f"获取网页授权access_token失败: {data}")
+                return None
+                
+        except requests.exceptions.RequestException as e:
+            print(f'请求网页授权access_token失败: {e}')
+            return None
+    
+    def get_oauth_userinfo(self, oauth_access_token: str, openid: str) -> Optional[Dict]:
+        """
+        拉取用户信息（需scope为snsapi_userinfo）
+        
+        Args:
+            oauth_access_token: 网页授权接口调用凭证（注意：不是普通access_token）
+            openid: 用户的唯一标识
+            
+        Returns:
+            用户信息字典，失败返回None
+        """
+        url = 'https://api.weixin.qq.com/sns/userinfo'
+        params = {
+            'access_token': oauth_access_token,
+            'openid': openid,
+            'lang': 'zh_CN'
+        }
+        
+        try:
+            response = requests.get(url, params=params, timeout=10, verify=False)
+            response.raise_for_status()
+            data = response.json()
+            
+            if 'errcode' not in data:
+                return data
+            else:
+                print(f"获取用户信息失败: {data}")
+                return None
+                
+        except requests.exceptions.RequestException as e:
+            print(f'请求用户信息失败: {e}')
+            return None
+    
+    def refresh_oauth_access_token(self, refresh_token: str) -> Optional[Dict]:
+        """
+        刷新网页授权access_token
+        
+        Args:
+            refresh_token: 填写通过get_oauth_access_token获取到的refresh_token参数
+            
+        Returns:
+            新的access_token信息，失败返回None
+        """
+        url = 'https://api.weixin.qq.com/sns/oauth2/refresh_token'
+        params = {
+            'appid': self.appid,
+            'grant_type': 'refresh_token',
+            'refresh_token': refresh_token
+        }
+        
+        try:
+            response = requests.get(url, params=params, timeout=10, verify=False)
+            response.raise_for_status()
+            data = response.json()
+            
+            if 'openid' in data:
+                return data
+            else:
+                print(f"刷新access_token失败: {data}")
+                return None
+                
+        except requests.exceptions.RequestException as e:
+            print(f'刷新access_token请求失败: {e}')
+            return None
+    
+    # ==================== 基础支持接口 ====================
+    # 用于主动调用微信API（如发送模板消息）
+    
     def get_access_token(self) -> Optional[str]:
         """
-        获取微信access_token（带缓存）
+        获取基础支持的access_token（带缓存）
+        用于主动调用微信API，如发送模板消息
+        
+        注意：此access_token与网页授权的access_token不同
         
         Returns:
             access_token字符串，失败返回None

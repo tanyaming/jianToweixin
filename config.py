@@ -22,9 +22,10 @@ class Config:
     WECHAT_APPSECRET = '8f1d12b6e8379e4aabe5b00fe95e7cd2'
     WECHAT_TEMPLATE_ID = 'bpXQnOahugVOBDYYLVY8dcfSxSO9-0PoV3qPEiY1u4E'
     EncodingAESKey = 'Le9lJqR8l2ZeAUzzGVCmWu4hX9W4ELWILbZXAr4p4Oc'
-
-
+    
     # 服务器配置
-    SERVER_IP = '8.137.123.168'
-    #域名
-    YUMING_HTJC = 'htjc.shop'
+    SERVER_IP = '8.137.123.138'
+    
+    # 域名配置
+    DOMAIN = 'htjc.shop'
+    BASE_URL = 'https://htjc.shop'  # 使用HTTPS
