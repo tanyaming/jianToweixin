@@ -3,7 +3,7 @@
 微信API封装
 包含：
 1. 网页授权获取OpenID
-2. 模板消息发送
+2. 客服消息发送
 3. 用户信息获取
 """
 import requests
@@ -243,87 +243,86 @@ class WeChatAPI:
             print(f'请求用户信息失败: {e}')
             return None
     
-    def send_template_message(self, openid: str, template_id: str, 
-                            data: Dict, url: str = '') -> bool:
+    def send_custom_message(self, openid: str, content: str, msgtype: str = 'text') -> bool:
         """
-        发送模板消息
+        发送客服消息
         
         Args:
             openid: 接收者OpenID
-            template_id: 模板ID
-            data: 模板数据
-            url: 跳转链接
+            content: 消息内容
+            msgtype: 消息类型（text/image/link等）
             
         Returns:
             发送成功返回True，失败返回False
         """
+        import json
+        
         access_token = self.get_access_token()
         if not access_token:
             return False
         
-        api_url = f'https://api.weixin.qq.com/cgi-bin/message/template/send?access_token={access_token}'
-        payload = {
-            'touser': openid,
-            'template_id': template_id,
-            'url': url,
-            'data': data
-        }
+        api_url = f'https://api.weixin.qq.com/cgi-bin/message/custom/send?access_token={access_token}'
+        
+        if msgtype == 'text':
+            payload = {
+                'touser': openid,
+                'msgtype': 'text',
+                'text': {
+                    'content': content
+                }
+            }
+        else:
+            return False
         
         try:
-            response = requests.post(api_url, json=payload, timeout=10, verify=False)
+            # 使用json.dumps确保不转义Unicode字符
+            json_data = json.dumps(payload, ensure_ascii=False).encode('utf-8')
+            response = requests.post(
+                api_url, 
+                data=json_data, 
+                timeout=10, 
+                verify=False,
+                headers={'Content-Type': 'application/json; charset=utf-8'}
+            )
             response.raise_for_status()
             result = response.json()
             
             if result.get('errcode') == 0:
                 return True
             else:
-                print(f"发送模板消息失败: {result}")
+                print(f"发送客服消息失败: {result}")
                 return False
                 
         except requests.exceptions.RequestException as e:
-            print(f'发送模板消息请求失败: {e}')
+            print(f'发送客服消息请求失败: {e}')
             return False
+    
+
     
     def send_daily_report_reminder(self, openid: str, employee_name: str, 
                                    report_status: str, report_url: str = '') -> bool:
         """
-        发送日报提醒消息
+        发送日报提醒消息（使用客服消息）
         
         Args:
             openid: 接收者OpenID
             employee_name: 员工姓名
             report_status: 日报状态（submitted/pending/admin_notify）
-            report_url: 日报链接
+            report_url: 日报链接（保留参数以兼容调用，但不使用）
             
         Returns:
             发送成功返回True，失败返回False
         """
-        template_id = Config.WECHAT_TEMPLATE_ID
-        
         # 根据不同状态构造消息内容
         if report_status == 'submitted':
             # 员工本人 - 已提交
-            message_data = {
-                'first': {'value': '您今日的工作日报已提交成功', 'color': '#173177'},
-                'keyword1': {'value': employee_name, 'color': '#173177'},
-                'keyword2': {'value': time.strftime('%Y-%m-%d %H:%M:%S'), 'color': '#173177'},
-                'remark': {'value': '点击查看日报详情', 'color': '#173177'}
-            }
+            message_text = f"✅ 日报提交成功\n\n您好，{employee_name}！\n您今日的工作日报已提交成功。\n\n提交时间：{time.strftime('%Y-%m-%d')}\n\n感谢您的及时提交！"
         elif report_status == 'admin_notify':
             # 管理员 - 员工已提交通知
-            message_data = {
-                'first': {'value': f'员工【{employee_name}】已提交今日工作日报', 'color': '#173177'},
-                'keyword1': {'value': employee_name, 'color': '#173177'},
-                'keyword2': {'value': time.strftime('%Y-%m-%d %H:%M:%S'), 'color': '#173177'},
-                'remark': {'value': '点击查看该员工日报详情', 'color': '#173177'}
-            }
+            message_text = f"📋 日报提交通知\n\n员工【{employee_name}】已提交今日工作日报。\n\n提交时间：{time.strftime('%Y-%m-%d')}"
         else:  # pending
             # 员工本人 - 未提交提醒
-            message_data = {
-                'first': {'value': '提醒您填写今日工作日报', 'color': '#173177'},
-                'keyword1': {'value': employee_name, 'color': '#173177'},
-                'keyword2': {'value': time.strftime('%Y-%m-%d %H:%M:%S'), 'color': '#173177'},
-                'remark': {'value': '请及时填写日报，点击进入填写页面', 'color': '#173177'}
-            }
+            message_text = f"⏰ 日报填写提醒\n\n您好，{employee_name}！\n\n请记得填写今日工作日报。\n日期：{time.strftime('%Y年%m月%d日')}\n\n请及时登录简道云填写日报，谢谢！"
         
-        return self.send_template_message(openid, template_id, message_data, report_url)
+        # 使用客服消息发送（无需订阅，48小时内互动过即可）
+        return self.send_custom_message(openid, message_text)

@@ -41,12 +41,15 @@ class DailyReportScheduler:
             # 4. 遍历每个成员检查日报
             for member in all_members:
                 phone = member.get('phonenumber')
-                openid = member.get('wxopenid')
+                openid = member.get('wxopenid')  # 已在 API 层标准化为字符串
                 name = member.get('name', {}).get('name', '未知')
                 role = member.get('juese', '员工')
                 
                 if not phone or not openid:
+                    print(f'  跳过成员 {name}: 缺少手机号或OpenID')
                     continue
+                
+                print(f'  使用 OpenID: {openid[:10]}...')
                 
                 print(f'检查成员: {name} ({role}) - {phone}')
                 
@@ -66,10 +69,12 @@ class DailyReportScheduler:
                     )
                     if success:
                         print(f'  → 已通知员工本人')
+                    else:
+                        print(f'  → 通知员工本人失败')
                     
                     # 通知所有管理员
                     for admin in admins:
-                        admin_openid = admin.get('wxopenid')
+                        admin_openid = admin.get('wxopenid')  # 已标准化为字符串
                         admin_name = admin.get('name', {}).get('name', '管理员')
                         
                         if admin_openid and admin_openid != openid:  # 不重复通知自己
@@ -78,6 +83,8 @@ class DailyReportScheduler:
                             )
                             if success:
                                 print(f'  → 已通知管理员: {admin_name}')
+                            else:
+                                print(f'  → 通知管理员失败: {admin_name}')
                 else:
                     # 未填写日报
                     print(f'  ✗ {name} 未填写日报')
@@ -88,6 +95,8 @@ class DailyReportScheduler:
                     )
                     if success:
                         print(f'  → 已发送提醒')
+                    else:
+                        print(f'  → 发送提醒失败')
             
             print(f'[{datetime.now()}] 日报检查任务完成')
             

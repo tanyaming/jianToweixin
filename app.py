@@ -50,12 +50,8 @@ def index():
     })
 
 
-@app.route('/MP_verify_<filename>.txt')
-def wechat_verify(filename):
-    """微信公众号域名验证文件"""
-    # 从微信公众平台获取验证码，替换下面的内容
-    verify_code = "请替换为你的验证码"
-    return verify_code, 200, {'Content-Type': 'text/plain'}
+# 微信验证文件由Nginx直接提供，不需要Flask路由
+# 验证文件位置: /var/www/htjc.shop/MP_verify_eF534DjVEJoukTqG.txt
 
 
 @app.route('/wechat', methods=['GET', 'POST'])

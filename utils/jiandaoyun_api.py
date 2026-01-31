@@ -128,7 +128,7 @@ class JiandaoyunAPI:
         获取所有有OpenID的员工列表
         
         Returns:
-            员工信息列表
+            员工信息列表（wxopenid字段已标准化为字符串）
         """
         url = f'{self.base_url}/app/entry/data/list'
         payload = {
@@ -142,9 +142,26 @@ class JiandaoyunAPI:
             response.raise_for_status()
             data = response.json()
             
-            # 过滤出有OpenID的员工
-            employees = data.get('data', [])
-            return [emp for emp in employees if emp.get('wxopenid')]
+            # 过滤出有OpenID的员工，并标准化数据格式
+            employees = []
+            for emp in data.get('data', []):
+                openid_field = emp.get('wxopenid')
+                
+                # 处理不同的数据格式
+                if isinstance(openid_field, dict):
+                    openid = openid_field.get('value', '')
+                elif isinstance(openid_field, str):
+                    openid = openid_field
+                else:
+                    openid = ''
+                
+                # 只添加有有效 openid 的员工
+                if openid:
+                    # 标准化 openid 为字符串格式
+                    emp['wxopenid'] = openid
+                    employees.append(emp)
+            
+            return employees
             
         except requests.exceptions.RequestException as e:
             print(f'获取员工列表失败: {e}')
