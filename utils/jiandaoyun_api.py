@@ -79,9 +79,8 @@ class JiandaoyunAPI:
             'entry_id': Config.JIANDAOYUN_EMPLOYEE_ENTRY_ID,
             'data_id': data_id,
             'data': {
-                'wxopenid': 
-                {
-                    "value": openid
+                'wxopenid': {
+                    'value': openid
                 }
             }
         }
@@ -95,21 +94,31 @@ class JiandaoyunAPI:
         try:
             response = requests.post(url, json=payload, headers=self.headers, timeout=10, verify=False)
             print(f'[DEBUG] 响应状态码: {response.status_code}')
-            print(f'[DEBUG] 响应内容: {response.text}')
+            print(f'[DEBUG] 响应内容: {response.text[:500]}...')  # 只打印前500字符
             
             response.raise_for_status()
-            data = response.json()
+            result = response.json()
             
-            # 简道云更新成功通常返回 code: 0
-            if data.get('code') == 0:
-                print(f'[DEBUG] OpenID 更新成功')
-                return True
+            # 简道云更新接口成功时返回更新后的数据对象
+            # 检查返回的data中是否包含wxopenid字段
+            if 'data' in result and '_id' in result['data']:
+                updated_openid = result['data'].get('wxopenid')
+                if updated_openid == openid:
+                    print(f'[DEBUG] ✅ OpenID 更新成功: {openid}')
+                    return True
+                else:
+                    print(f'[DEBUG] ✅ OpenID 已更新（返回数据包含_id）')
+                    return True
+            # 如果有错误码，说明失败
+            elif 'code' in result and result['code'] != 0:
+                print(f'[DEBUG] ❌ OpenID 更新失败: {result}')
+                return False
             else:
-                print(f'[DEBUG] OpenID 更新失败: {data}')
+                print(f'[DEBUG] ⚠️ 无法确认更新状态: {result}')
                 return False
             
         except requests.exceptions.RequestException as e:
-            print(f'更新员工OpenID失败: {e}')
+            print(f'❌ 更新员工OpenID失败: {e}')
             if hasattr(e, 'response') and e.response is not None:
                 print(f'[DEBUG] 错误响应: {e.response.text}')
             return False

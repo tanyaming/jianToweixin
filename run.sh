@@ -44,7 +44,7 @@ case $mode in
         # 检查gunicorn是否安装
         python -c "import gunicorn" 2>/dev/null
         if [ $? -eq 0 ]; then
-            gunicorn -w 4 -b 0.0.0.0:5000 app:app
+            gunicorn -w 4 -b 0.0.0.0:5008 app:app
         else
             echo "✗ 未安装gunicorn，请运行: pip install gunicorn"
             exit 1
