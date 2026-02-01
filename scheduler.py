@@ -63,14 +63,38 @@ class DailyReportScheduler:
                     # 已填写日报
                     print(f'  ✓ {name} 已填写日报')
                     
+                    # 提取工作内容（从mrgzhb数组中）
+                    work_content = ''
+                    if 'mrgzhb' in daily_report and isinstance(daily_report['mrgzhb'], list):
+                        work_items = []
+                        for item in daily_report['mrgzhb']:
+                            if isinstance(item, dict):
+                                gzsx = item.get('gzsx', '')  # 工作事项
+                                gznr = item.get('gznr', '')  # 工作内容
+                                gzjd = item.get('gzjd', '')  # 工作进度
+                                
+                                if gzsx or gznr:
+                                    # 组合工作事项和内容
+                                    if gzsx and gznr:
+                                        work_items.append(f"{gzsx}: {gznr}")
+                                    elif gzsx:
+                                        work_items.append(gzsx)
+                                    elif gznr:
+                                        work_items.append(gznr)
+                        
+                        # 用换行符连接所有工作项
+                        work_content = '\n'.join(work_items)
+                    
+                    print(f'  [DEBUG] 提取的工作内容: {work_content[:100] if work_content else "空"}...')
+                    
                     # 通知员工本人
                     success = self.wechat_api.send_daily_report_reminder(
-                        openid, name, 'submitted', report_url
+                        openid, name, 'submitted', report_url, work_content
                     )
                     if success:
                         print(f'  → 已通知员工本人')
                     else:
-                        print(f'  → 通知员工本人失败')
+                        print(f'  → 通知员工本人失败（可能超过48小时互动窗口，用户需要重新与公众号互动）')
                     
                     # 通知所有管理员
                     for admin in admins:
@@ -79,7 +103,7 @@ class DailyReportScheduler:
                         
                         if admin_openid and admin_openid != openid:  # 不重复通知自己
                             success = self.wechat_api.send_daily_report_reminder(
-                                admin_openid, name, 'admin_notify', report_url
+                                admin_openid, name, 'admin_notify', report_url, work_content
                             )
                             if success:
                                 print(f'  → 已通知管理员: {admin_name}')
@@ -96,7 +120,7 @@ class DailyReportScheduler:
                     if success:
                         print(f'  → 已发送提醒')
                     else:
-                        print(f'  → 发送提醒失败')
+                        print(f'  → 发送提醒失败（可能超过48小时互动窗口，用户需要重新与公众号互动）')
             
             print(f'[{datetime.now()}] 日报检查任务完成')
             

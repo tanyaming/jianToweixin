@@ -290,7 +290,16 @@ class WeChatAPI:
             if result.get('errcode') == 0:
                 return True
             else:
-                print(f"发送客服消息失败: {result}")
+                errcode = result.get('errcode')
+                errmsg = result.get('errmsg', '')
+                
+                # 特殊错误码提示
+                if errcode == 45015:
+                    print(f"发送客服消息失败: 超过48小时互动窗口，用户需要重新与公众号互动（发消息/点菜单）")
+                elif errcode == 45047:
+                    print(f"发送客服消息失败: 客服接口下行条数超过上限")
+                else:
+                    print(f"发送客服消息失败: {result}")
                 return False
                 
         except requests.exceptions.RequestException as e:
@@ -300,7 +309,8 @@ class WeChatAPI:
 
     
     def send_daily_report_reminder(self, openid: str, employee_name: str, 
-                                   report_status: str, report_url: str = '') -> bool:
+                                   report_status: str, report_url: str = '', 
+                                   work_content: str = '') -> bool:
         """
         发送日报提醒消息（使用客服消息）
         
@@ -309,6 +319,7 @@ class WeChatAPI:
             employee_name: 员工姓名
             report_status: 日报状态（submitted/pending/admin_notify）
             report_url: 日报链接（保留参数以兼容调用，但不使用）
+            work_content: 工作内容（仅在submitted状态时使用）
             
         Returns:
             发送成功返回True，失败返回False
@@ -316,10 +327,31 @@ class WeChatAPI:
         # 根据不同状态构造消息内容
         if report_status == 'submitted':
             # 员工本人 - 已提交
-            message_text = f"✅ 日报提交成功\n\n您好，{employee_name}！\n您今日的工作日报已提交成功。\n\n提交时间：{time.strftime('%Y-%m-%d')}\n\n感谢您的及时提交！"
+            message_text = f"✅ 日报提交成功\n\n您好，{employee_name}！\n您今日的工作日报已提交成功。\n\n提交时间：{time.strftime('%Y-%m-%d')}"
+            
+            # 如果有工作内容，添加工作内容摘要
+            if work_content:
+                # 限制工作内容长度，避免消息过长（微信客服消息限制2048字符）
+                if len(work_content) > 200:
+                    content_preview = work_content[:200] + '...'
+                else:
+                    content_preview = work_content
+                message_text += f"\n\n📝 今日工作：\n{content_preview}"
+            
+            message_text += "\n\n感谢您的及时提交！"
+            
         elif report_status == 'admin_notify':
             # 管理员 - 员工已提交通知
             message_text = f"📋 日报提交通知\n\n员工【{employee_name}】已提交今日工作日报。\n\n提交时间：{time.strftime('%Y-%m-%d')}"
+            
+            # 管理员通知也显示工作内容摘要
+            if work_content:
+                if len(work_content) > 150:
+                    content_preview = work_content[:150] + '...'
+                else:
+                    content_preview = work_content
+                message_text += f"\n\n📝 工作内容：\n{content_preview}"
+                
         else:  # pending
             # 员工本人 - 未提交提醒
             message_text = f"⏰ 日报填写提醒\n\n您好，{employee_name}！\n\n请记得填写今日工作日报。\n日期：{time.strftime('%Y年%m月%d日')}\n\n请及时登录简道云填写日报，谢谢！"
