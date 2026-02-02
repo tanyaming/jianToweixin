@@ -36,8 +36,10 @@ app.logger.info('应用启动')
 jdy_api = JiandaoyunAPI()
 wechat_api = WeChatAPI()
 
-# 初始化定时任务
+# 初始化并启动定时任务
 scheduler = DailyReportScheduler()
+scheduler.start()
+app.logger.info('定时任务已启动')
 
 #test
 
@@ -48,6 +50,43 @@ def index():
         'status': 'ok',
         'message': '简道云日报提醒系统运行中'
     })
+
+
+@app.route('/scheduler/status')
+def scheduler_status():
+    """查看定时任务状态"""
+    jobs = scheduler.scheduler.get_jobs()
+    job_info = []
+    
+    for job in jobs:
+        job_info.append({
+            'id': job.id,
+            'name': job.name,
+            'next_run_time': str(job.next_run_time) if job.next_run_time else 'N/A',
+            'trigger': str(job.trigger)
+        })
+    
+    return jsonify({
+        'status': 'ok',
+        'scheduler_running': scheduler.scheduler.running,
+        'jobs': job_info
+    })
+
+
+@app.route('/scheduler/run_now', methods=['POST'])
+def scheduler_run_now():
+    """手动触发定时任务（用于测试）"""
+    try:
+        scheduler.run_now()
+        return jsonify({
+            'status': 'ok',
+            'message': '任务已手动触发执行'
+        })
+    except Exception as e:
+        return jsonify({
+            'status': 'error',
+            'message': str(e)
+        }), 500
 
 
 # 微信验证文件由Nginx直接提供，不需要Flask路由
@@ -446,9 +485,7 @@ def test_reminder():
 
 
 if __name__ == '__main__':
-    # 启动定时任务
-    scheduler.start()
-    
+    # 直接运行时使用开发服务器
     try:
         app.run(host='0.0.0.0', port=5008, debug=True)
     except (KeyboardInterrupt, SystemExit):
